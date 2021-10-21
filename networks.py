@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import pdb
 
-WINDOW_SIZE = 128
+WINDOW_SIZE = 256
 class UpdatingMean():
     def __init__(self) -> None:
         self.sum = 0
@@ -42,7 +42,7 @@ class CNN_Model(nn.Module):
             nn.Upsample(scale_factor=2, mode = 'bilinear'),
             ##[N, 64, 64, 64]
             nn.Conv2d(64, 3, 1, stride=1),
-            nn.Softmax(dim=1),
+            #nn.Softmax(dim=1),
         )
 
         self.Classifier = nn.Sequential(
@@ -54,7 +54,7 @@ class CNN_Model(nn.Module):
     def forward(self, batch):
 
         x = self.layers(batch)
-        # print(x.shape)
+        #print(x.shape,batch.shape)
         # pdb.set_trace()
 
         b = x.size(0)
@@ -63,5 +63,8 @@ class CNN_Model(nn.Module):
         
         # pdb.set_trace()
         return x
+
+
+
 
     

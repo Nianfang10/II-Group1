@@ -1,5 +1,5 @@
 from matplotlib.pyplot import get
-from numpy import split
+from numpy import logical_not, split
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -10,10 +10,14 @@ from tqdm import tqdm
 from dataset_windows import SatelliteSet
 from networks import UpdatingMean, CNN_Model
 import pdb
+import wandb
+
+
 BATCH_SIZE = 16
-NUM_WORKERS = 8
+NUM_WORKERS = 2
 NUM_EPOCHS = 500
 CUDA_DEVICE = 'cuda:0'
+WINDOW_SIZE = 256
 def train_one_epoch(net, optimizer, dataloader):
     #raise NotImplementedError
     loss_aggregator = UpdatingMean()
@@ -46,6 +50,7 @@ def train_one_epoch(net, optimizer, dataloader):
 
         loss.backward()
         optimizer.step()
+        wandb.log({"Training loss": loss})
         
 
         loss_aggregator.add(loss.item())
@@ -56,6 +61,7 @@ def train_one_epoch(net, optimizer, dataloader):
 
 def compute_accuracy(output, labels):
     predictions = torch.argmax(output, dim = 1)
+    #print(predictions.shape)
     mask = (labels != 99)
     #print(output.shape, predictions.shape,labels.shape)
     # pdb.set_trace()
@@ -63,6 +69,7 @@ def compute_accuracy(output, labels):
 
 def run_validation_epoch(net,dataloader):
     accuracy_aggregator = UpdatingMean()
+    loss_aggregator = UpdatingMean()
     # Put the network in evaluation mode.
     net.eval()
     # Loop over batches.
@@ -72,15 +79,24 @@ def run_validation_epoch(net,dataloader):
 
         # Compute the accuracy using compute_accuracy.
         accuracy = compute_accuracy(output, batch[1].to(torch.device(CUDA_DEVICE)))
+        loss = F.cross_entropy(output, batch[1].to(torch.device(CUDA_DEVICE)), ignore_index = 99)
+        #wandb.log({"Validating loss": loss,"Validating acc.": accuracy})
 
         # Save accuracy value in the aggregator.
         accuracy_aggregator.add(accuracy.item())
+        loss_aggregator.add(loss.item())
 
-    return accuracy_aggregator.mean()
+    return accuracy_aggregator.mean(),loss_aggregator.mean()
 
 
 if __name__ == '__main__':
-    train_dataset = SatelliteSet(windowsize=128,split='train')
+    wandb.init(project = 'II_project1',name = "Model 1")
+    # config = wandb.config
+    # config.batch_size = BATCH_SIZE
+    # config.epochs = NUM_EPOCHS
+    # config.lr = 0.01
+
+    train_dataset = SatelliteSet(windowsize=WINDOW_SIZE,split='train')
     train_dataloader = DataLoader(
         train_dataset,
         batch_size = BATCH_SIZE,
@@ -88,20 +104,20 @@ if __name__ == '__main__':
         shuffle = True
     )
 
-    validate_dataset = SatelliteSet(windowsize=128,split='validate')
+    validate_dataset = SatelliteSet(windowsize=WINDOW_SIZE,split='validate')
     validate_dataloader = DataLoader(
         validate_dataset,
         batch_size = BATCH_SIZE,
         num_workers = NUM_WORKERS,
-        shuffle = True
+        shuffle = False
     )
 
-    test_dataset = SatelliteSet(windowsize=128,split='test')
+    test_dataset = SatelliteSet(windowsize=WINDOW_SIZE,split='test')
     test_dataloader = DataLoader(
         test_dataset,
         batch_size = BATCH_SIZE,
         num_workers = NUM_WORKERS,
-        shuffle = True
+        shuffle = False
     )
 
 
@@ -115,8 +131,8 @@ if __name__ == '__main__':
     optimizer = Adam(net.parameters())
     #optimizer = SGD(net.parameters(), lr=0.01, momentum=0.9)
     
-    acc = run_validation_epoch(net, validate_dataloader)
-    print('Initial accuracy:%.4f' %(acc*100)+'%')
+    #val_acc,val_loss = run_validation_epoch(net, validate_dataloader)
+    #print('Initial accuracy:%.4f%%, loss:%.4f' %(val_acc*100,val_loss))
 
     
 
@@ -124,11 +140,13 @@ if __name__ == '__main__':
     for epoch_idx in range(NUM_EPOCHS):
         #training part
         loss = train_one_epoch(net,optimizer,train_dataloader)
-        print('Epoch %02d, Loss = %0.4f' %(epoch_idx + 1, loss))
+        print('Epoch %02d,Training Loss = %0.4f' %(epoch_idx + 1, loss))
 
         #validate part
-        acc = run_validation_epoch(net, validate_dataloader)
-        print('[Epoch %02d] Acc.: %.4f' % (epoch_idx + 1, acc * 100) + '%')
+        val_acc, val_loss = run_validation_epoch(net, validate_dataloader)
+        print('[Epoch %02d] Validating Acc.: %.4f%%, Loss:%.4f' % (epoch_idx + 1, val_acc * 100, val_loss))
+        
+        wandb.log({"Validating loss": val_loss,"Validating acc.": val_acc})
 
         #save checkpoint
         checkpoint = {
@@ -137,13 +155,19 @@ if __name__ == '__main__':
             'optimizer': optimizer.state_dict(),
         }
 
-        if acc > best_accuarcy:
-            best_accuarcy = acc
+        if val_acc > best_accuarcy:
+            best_accuarcy = val_acc
             torch.save(checkpoint, f'checkpoint/best-{net.codename}.pth')
 
-        if epoch_idx % 50 == 0:
-            acc = run_validation_epoch(net, test_dataloader)
-            print('[Epoch %02d] Test Acc.: %.4f' % (epoch_idx + 1, acc * 100) + '%')
+        if epoch_idx % 10 == 0:
+            test_acc,test_loss = run_validation_epoch(net, test_dataloader)
+            print('[Epoch %02d] Test Acc.: %.4f' % (epoch_idx + 1, test_acc * 100) + '%')
+            wandb.log({"Testing loss": test_loss,"Test acc.": test_acc})
+    
+    print('Best validating acc. %.4f%%',best_accuarcy)
+    wandb.log({
+        "Best acc.":best_accuarcy
+    })
 
         
 

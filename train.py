@@ -3,7 +3,7 @@ from numpy import split
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from torch.optim import Adam
+from torch.optim import Adam, Adadelta
 
 from tqdm import tqdm
 
@@ -12,7 +12,7 @@ from networks import UpdatingMean, CNN_Model
 import pdb
 BATCH_SIZE = 16
 NUM_WORKERS = 8
-NUM_EPOCHS = 5
+NUM_EPOCHS = 500
 CUDA_DEVICE = 'cuda:0'
 def train_one_epoch(net, optimizer, dataloader):
     #raise NotImplementedError
@@ -30,8 +30,6 @@ def train_one_epoch(net, optimizer, dataloader):
         output = net.forward(batch[0].to(torch.device(CUDA_DEVICE)))
         
         #print(predictions)
-        
-        
         #pdb.set_trace()
         
         # mse_loss = torch.nn.MSELoss()
@@ -43,8 +41,8 @@ def train_one_epoch(net, optimizer, dataloader):
         loss = F.cross_entropy(output, batch[1].to(torch.device(CUDA_DEVICE)), ignore_index = 99)
 
         count += 1
-        if(count%1000 == 0):
-            print("loss:",loss.data)
+        # if(count%1000 == 0):
+        #     print("loss:",loss.data)
 
         loss.backward()
         optimizer.step()
@@ -82,7 +80,7 @@ def run_validation_epoch(net,dataloader):
 
 
 if __name__ == '__main__':
-    train_dataset = SatelliteSet(windowsize=32,split='train')
+    train_dataset = SatelliteSet(windowsize=128,split='train')
     train_dataloader = DataLoader(
         train_dataset,
         batch_size = BATCH_SIZE,
@@ -90,7 +88,7 @@ if __name__ == '__main__':
         shuffle = True
     )
 
-    validate_dataset = SatelliteSet(windowsize=32,split='validate')
+    validate_dataset = SatelliteSet(windowsize=128,split='validate')
     validate_dataloader = DataLoader(
         validate_dataset,
         batch_size = BATCH_SIZE,
@@ -98,13 +96,27 @@ if __name__ == '__main__':
         shuffle = True
     )
 
-    device = torch.device(CUDA_DEVICE)
-    
+    test_dataset = SatelliteSet(windowsize=128,split='test')
+    test_dataloader = DataLoader(
+        test_dataset,
+        batch_size = BATCH_SIZE,
+        num_workers = NUM_WORKERS,
+        shuffle = True
+    )
 
+
+    device = torch.device(CUDA_DEVICE)
+
+    
     net = CNN_Model()
+    #torch.nn.init.xavier_normal_(CNN_Model.parameters())
     net.to(device)
 
     optimizer = Adam(net.parameters())
+    #optimizer = SGD(net.parameters(), lr=0.01, momentum=0.9)
+    
+    acc = run_validation_epoch(net, validate_dataloader)
+    print('Initial accuracy:%.4f' %(acc*100)+'%')
 
     
 
@@ -128,6 +140,10 @@ if __name__ == '__main__':
         if acc > best_accuarcy:
             best_accuarcy = acc
             torch.save(checkpoint, f'checkpoint/best-{net.codename}.pth')
+
+        if epoch_idx % 50 == 0:
+            acc = run_validation_epoch(net, test_dataloader)
+            print('[Epoch %02d] Test Acc.: %.4f' % (epoch_idx + 1, acc * 100) + '%')
 
         
 

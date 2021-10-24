@@ -16,6 +16,9 @@ import h5py
 import torch
 from torch.utils.data import DataLoader
 from torchvision.utils import make_grid
+import numpy.ma as ma
+from tqdm import trange
+import time
 #from KMeans import distance, kmeans, save_result
 #BATCH_SIZE = 16
 #NUM_WORKERS = 8
@@ -103,12 +106,40 @@ if __name__ == "__main__":
     colormap = [[47, 79, 79], [0, 255, 0], [255, 255, 255], [0, 0, 0]]
     # 0 = background, 1 = palm oil trees, 2 = clouds
     colormap = np.asarray(colormap)
-    for data in dl:
+    for data in tqdm(dl):
         orglabel = data[1][0];
         orglabelnp = orglabel.numpy();
         RGB = 255*data[0][0][0];
         if 99 in orglabelnp:
             null.append(i);
+            mask99 = ma.masked_values(orglabelnp, 99);
+            #orglabelno99 = orglabelnp[~mask99.mask];
+            orglabelno99 = mask99.data;
+            npRGB = RGB.numpy();
+            #RGBno99 = npRGB[~mask99.mask];
+            RGBno99mar = ma.array(npRGB,mask=mask99.mask);
+            RGBno99 = RGBno99mar.data;
+            pixlabel, center = k_means(RGBno99,3,1);
+            realpixlabel = pixlabel.copy();
+            center0 = int(center[0]);
+            center1 = int(center[1]);
+            center2 = int(center[2]);
+            index0 = np.argwhere(RGBno99 == center0);
+            if len(index0) != 0:
+                klabel0 = pixlabel[index0[0][0]][index0[0][1]];
+                olabel0 = orglabelnp[index0[0][0]][index0[0][1]];
+                realpixlabel[pixlabel == klabel0] = olabel0;
+            index1 = np.argwhere(RGBno99 == center1);
+            if len(index1) != 0:                
+                klabel1 = pixlabel[index1[0][0]][index1[0][1]];
+                olabel1 = orglabelnp[index1[0][0]][index1[0][1]];
+                realpixlabel[pixlabel == klabel1] = olabel1;
+            index2 = np.argwhere(RGBno99 == center2);
+            if len(index2) != 0:
+                klabel2 = pixlabel[index2[0][0]][index2[0][1]];
+                olabel2 = orglabelnp[index2[0][0]][index2[0][1]];
+                realpixlabel[pixlabel == klabel2] = olabel2;
+            similarity.append((realpixlabel==orglabelno99).sum()/realpixlabel.size);
         else:
             pixlabel, center = k_means(RGB,3,1);
             #print(pixlabel);
@@ -138,7 +169,7 @@ if __name__ == "__main__":
         
         
         #print(pixlabel[i])
-        i+=1;
+        #i+=1;
         #print(255*data[0][0][0]);
         
     #img, lable = tqdm(dl)

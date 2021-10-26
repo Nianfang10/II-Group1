@@ -12,10 +12,10 @@ First we use a traditional classification method [to be determined], the perform
 
 The architecture of our deep neural network:  
 (1)Model 1: A simple CNN architecture.  
-![image](visualization\Simple_CNN.png)
+![image](https://github.com/Nianfang10/II-Group1/blob/main/visualization/Simple_CNN.png)
 
-(2)Model 2: Simplified UNet.
-![image](visualization\Simplified_UNet.png)
+(2)Model 2: Simplified UNet.  
+![image](https://github.com/Nianfang10/II-Group1/blob/main/visualization/Simplified_UNet.png)
 The accuracy of the network:  
 | DNN         | Validate Acc. |Test Acc.| Precision |Recall  |  F1  |
 | ----------- | ----------- | --------- |-----------|--------|----- |

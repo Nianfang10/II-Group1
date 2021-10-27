@@ -6,16 +6,16 @@ The goal of Lab 1 is to implement and train a DNN to classify the pixels on remo
 
 We have tried three different architecture: A simple CNN, UNet and SegNet.
 ___
-**Architecture 1: A simple CNN**  
+# **Architecture 1: A simple CNN**  
 ![image](https://github.com/Nianfang10/II-Group1/blob/main/visualization/Simple_CNN.png)
 ___
-**Architecture 2: Simplified UNet**  
+# **Architecture 2: Simplified UNet**  
 ![image](https://github.com/Nianfang10/II-Group1/blob/main/visualization/Simplified_UNet.png)  
 ___
-**Architecture 3: SegNet**  
-![image](https://github.com/Nianfang10/II-Group1/blob/main/visualization/Simplified_SegNet.png)  
+# **Architecture 3: SegNet**  
+![image](https://github.com/Nianfang10/II-Group1/blob/main/visualization/Simplified_SegNet.PNG)  
 ___
-Performance:  
+# Performance:  
 | DNN         | Validate Acc. |Test Acc.| Precision |Recall  |  F1  |
 | ----------- | ----------- | --------- |-----------|--------|----- |
 |Simple CNN   | 93.46%      |  94.54%   |  87.13%   | 95.50% |90.25%|

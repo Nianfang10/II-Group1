@@ -6,17 +6,17 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import pdb
-from networks import CNN_Model, UNet
+from networks import CNN_Model, UNet, SegNet
 from tqdm import tqdm
 from dataset_windows import SatelliteSet
 
 from sklearn.metrics import precision_recall_fscore_support, confusion_matrix, accuracy_score
 
 BATCH_SIZE = 1
-NUM_WORKERS = 1
+NUM_WORKERS = 0
 CUDA_DEVICE = 'cuda:0'
 if  __name__ == '__main__':
-    test_dataset = SatelliteSet(windowsize=512,split='test')
+    test_dataset = SatelliteSet(windowsize=720,split='test')
     test_dataloader = DataLoader(
         test_dataset,
         batch_size = BATCH_SIZE,
@@ -25,8 +25,8 @@ if  __name__ == '__main__':
     )
 
     #net = CNN_Model()
-    net = UNet()
-    net.load_state_dict(torch.load('./checkpoint/UNet_2021-10-26-13-23-06_95.92007308425408.pth')['net'])
+    net = SegNet()
+    net.load_state_dict(torch.load('./checkpoint/SegNet_2021-10-27-06-09-16_93.8442482213122.pth')['net'])
     net.to(torch.device(CUDA_DEVICE))
     net.eval()
 
@@ -48,41 +48,40 @@ if  __name__ == '__main__':
 
 
     idx = 0
-
     
     for batch in tqdm(test_dataloader):
-        #print(batch[0].shape,batch[1].shape)
-        output = net(batch[0].to(torch.device(CUDA_DEVICE)))
         
+        output = net(batch[0].to(torch.device(CUDA_DEVICE)))
+        #print(batch[0].shape)
         mask = ((batch[0][:,0,:,:]+batch[0][:,1,:,:]+batch[0][:,2,:,:]+batch[0][:,3,:,:])==0).to(torch.device(CUDA_DEVICE))
         
         predictions = torch.argmax(output, dim = 1) 
        
         gt = batch[1].to(torch.device(CUDA_DEVICE))
         mask = (gt == 99)
-        gt[mask] = 3;
-        predictions[mask] = 3;
+        gt[mask] = 3
+        predictions[mask] = 3
         acc = torch.mean(( predictions == gt).float())
         #print('Acc = %0.4f%%' %(acc*100))
         true_label_list.append(gt.view(-1).cpu().detach().numpy())
         pred_label_list.append(predictions.view(-1).cpu().detach().numpy())
         
 
-        # plt.rcParams["figure.figsize"] = (10,6)
-        # f,axarr = plt.subplots(ncols=2, nrows=1)
-        
-        # axarr[0].set_title('Prediction')
-        # axarr[0].imshow(predictions[0,:,:].cpu().detach().numpy())
-        # axarr[1].set_title('Ground Truth')
-        # axarr[1].imshow(gt[0,:,:].cpu().detach().numpy())
+        plt.rcParams["figure.figsize"] = (10,6)
+        f,axarr = plt.subplots(ncols=2, nrows=1)
+        axarr[0].set_title('Prediction')
+        axarr[0].imshow(predictions[0,:,:].cpu().detach().numpy())
+        axarr[1].set_title('Ground Truth')
+        axarr[1].imshow(gt[0,:,:].cpu().detach().numpy())
         #plt.show()
-        #plt.savefig('./visualization/UNet/'+str(idx)+'.JPG')
-        #plt.close()
-
-
+        
+        plt.savefig('./visualization/'+net.codename +'/'+str(idx)+'.JPG')
+        plt.close()
         idx = idx + 1
         torch.cuda.empty_cache()
         
+
+
         #pdb.set_trace()
         #print(predictions)
     

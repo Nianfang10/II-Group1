@@ -9,7 +9,7 @@ from torch.optim import Adam, lr_scheduler
 from tqdm import tqdm
 
 from dataset_windows import SatelliteSet
-from networks import UpdatingMean, CNN_Model, UNet
+from networks import UpdatingMean, CNN_Model, UNet, SegNet
 import pdb
 import wandb
 from datetime import datetime
@@ -115,7 +115,8 @@ if __name__ == '__main__':
 
     
     #net = CNN_Model()
-    net = UNet()
+    #net = UNet()
+    net = SegNet()
     net.to(device)
 
     optimizer = Adam(net.parameters(),lr = Learning_rate,weight_decay = 0.00005)

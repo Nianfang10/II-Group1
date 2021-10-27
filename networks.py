@@ -1,6 +1,7 @@
 from re import S
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import pdb
 
 WINDOW_SIZE = 256
@@ -156,5 +157,74 @@ class UNet(nn.Module):
         c2 = self.Up_conv2(c2)
         
         c1 = self.Up_conv1(c2)
+        
+        return c1
+
+
+class SegNet(nn.Module):
+    def __init__(self,in_channels = 4, out_channels = 3):
+        super().__init__()
+
+        self.codename = 'SegNet'
+        filters = [32,64,128,256]
+
+        
+        self.Conv1 = conv_block(in_channels,filters[0])
+        self.Conv2 = conv_block(filters[0],filters[1])
+        self.Conv31 = conv_block(filters[1],filters[2])
+        self.Conv32 = nn.Conv2d(filters[2], filters[2], kernel_size = 3, padding=1)
+        self.bn33 = nn.BatchNorm2d(filters[2])
+
+        self.Conv41 = conv_block(filters[2],filters[3])
+        self.Conv42 = nn.Conv2d(filters[3],filters[3], kernel_size = 3, padding=1)
+        self.bn43 = nn.BatchNorm2d(filters[3])
+
+
+        self.Conv5 = conv_block(filters[3], filters[2])
+        self.Conv52 = nn.Conv2d(filters[2],filters[2], kernel_size = 3, padding=1)
+        self.bn53 = nn.BatchNorm2d(filters[2])
+
+        self.Conv6 = conv_block(filters[2], filters[1])
+        self.Conv62 = nn.Conv2d(filters[1],filters[1], kernel_size = 3, padding=1)
+        self.bn63 = nn.BatchNorm2d(filters[1])
+
+        self.Conv7 = conv_block(filters[1], filters[0])
+        self.Conv8 = conv_block(filters[0], out_channels)
+        
+       
+        
+
+    def forward(self, x):
+        b1 = self.Conv1(x) #[size,size]
+        b1_size = b1.size()
+        b1p,id1 = F.max_pool2d(b1,kernel_size = 2,stride = 2, return_indices = True) #[size/2,size/2]
+
+        b2 = self.Conv2(b1p)
+        b2_size = b2.size()
+        b2p,id2 = F.max_pool2d(b2,kernel_size = 2,stride = 2, return_indices = True) #[size/4,size/4]
+
+        b3 = self.Conv31(b2p)
+        b3 = F.relu(self.bn33(self.Conv32(b3)))
+        b3_size = b3.size()
+        b3p,id3 = F.max_pool2d(b3,kernel_size = 2,stride = 2, return_indices = True) #[size/8,size/8]
+
+        b4 = self.Conv41(b3p)
+        b4 = F.relu(self.bn43(self.Conv42(b4)))
+        b4_size = b4.size()
+        b4p,id4 = F.max_pool2d(b4,kernel_size = 2,stride = 2, return_indices = True) #[size/16,size/16]
+
+        c4 = F.max_unpool2d(b4p, id4 , kernel_size = 2, stride = 2, output_size = b4_size)#[size/8,size/8]
+        c4 = self.Conv5(c4)
+        c4 = F.relu(self.bn53(self.Conv52(c4)))
+
+        c3 = F.max_unpool2d(c4, id3 , kernel_size = 2, stride = 2, output_size = b3_size)#[size/4,size/4]
+        c3 = self.Conv6(c3)
+        c3 = F.relu(self.bn63(self.Conv62(c3)))
+
+        c2 = F.max_unpool2d(c3, id2, kernel_size= 2,stride=2,output_size=b2_size)#[size/2,size/2]
+        c2 = self.Conv7(c2)
+
+        c1 = F.max_unpool2d(c2, id1, kernel_size= 2,stride=2,output_size=b1_size)#[size,size]
+        c1 = self.Conv8(c1)
         
         return c1
